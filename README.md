@@ -15,17 +15,13 @@ npm prefix -g
 # add the printed path + /bin to PATH
 ```
 
-For zsh, add this to `~/.zshrc`:
+Add the npm global bin directory to your shell startup file, such as `~/.zshrc`, `~/.bashrc`, or your shell equivalent:
 
 ```bash
 export PATH="$(npm prefix -g)/bin:$PATH"
 ```
 
-Then reload your shell:
-
-```bash
-source ~/.zshrc
-```
+Then reload your shell or open a new terminal.
 
 Or run without installing:
 
