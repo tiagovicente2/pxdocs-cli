@@ -1,32 +1,25 @@
 # pxdocs-cli
 
-CLI for discovering PX docs from a local `px-docs` checkout, with an optional GitHub CLI fallback.
+Fast Rust CLI for discovering PX docs from a local `px-docs` checkout, with an optional GitHub CLI fallback.
 
 ## Install locally
 
 ```bash
-npm install -g .
+cargo install --path . --force
 ```
 
-If `pxdocs` is not found after installing, make sure the npm global bin directory is in your `PATH`:
+Make sure Cargo's bin directory is in your `PATH`:
 
 ```bash
-npm prefix -g
-# add the printed path + /bin to PATH
+export PATH="$HOME/.cargo/bin:$PATH"
 ```
 
-Add the npm global bin directory to your shell startup file, such as `~/.zshrc`, `~/.bashrc`, or your shell equivalent:
-
-```bash
-export PATH="$(npm prefix -g)/bin:$PATH"
-```
-
-Then reload your shell or open a new terminal.
+Add that line to your shell startup file, such as `~/.zshrc`, `~/.bashrc`, or your shell equivalent, then reload your shell or open a new terminal.
 
 Or run without installing:
 
 ```bash
-npm start -- <command>
+cargo run -- <command>
 ```
 
 ## Setup
@@ -51,9 +44,9 @@ pxdocs search "usequery" --refresh
 pxdocs search "usequery" --no-fetch
 ```
 
-Local docs commands check whether the configured repo is behind its upstream and print a warning when it is. To keep search fast, the CLI runs `git fetch` at most once every 10 minutes by default.
+Local docs commands warn from the last known remote state before printing results. To keep search fast, the CLI runs `git fetch` after the command output, at most once every 10 minutes by default.
 
-Use `--refresh` to force a fetch or `--no-fetch` to skip it:
+Use `--refresh` to force the post-command fetch or `--no-fetch` to skip it.
 
 ## Remote fallback
 
