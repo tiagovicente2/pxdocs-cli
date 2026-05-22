@@ -1,0 +1,20 @@
+{
+  "name": "pxdocs-cli",
+  "version": "0.1.0",
+  "description": "CLI for discovering PX docs decisions and guides",
+  "type": "module",
+  "bin": {
+    "pxdocs": "./bin/pxdocs.js"
+  },
+  "scripts": {
+    "start": "node ./bin/pxdocs.js",
+    "check": "node --check ./bin/pxdocs.js && node --check ./src/*.js"
+  },
+  "keywords": [
+    "px",
+    "docs",
+    "cli"
+  ],
+  "author": "",
+  "license": "UNLICENSED"
+}
