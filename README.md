@@ -1,20 +1,69 @@
 # pxdocs-cli
 
-Fast Rust CLI for discovering PX docs from a local `px-docs` checkout, with an optional GitHub CLI fallback.
+Fast Rust CLI for finding PX docs, decisions, guides, ADRs and RFCs from a local `px-docs` checkout, with optional GitHub fallback.
 
-## Install locally
+## Quick start
+
+```bash
+./install.sh
+pxdocs setup ~/dev/px-docs
+pxdocs search "react query"
+```
+
+If you run a docs command before setup, the CLI asks for the local `px-docs` path. Press enter without typing a path to use the GitHub fallback.
+
+## Common commands
+
+```bash
+pxdocs search "usequery"
+pxdocs decisions --guild front --limit 10
+pxdocs show 011 --guild front
+pxdocs show docs/front-guild/decisions/011-usequery-para-consulta-de-dados.md
+pxdocs doctor
+```
+
+## Freshness and performance
+
+Local commands print results first, then run `git fetch` after output at most once every 10 minutes.
+
+```bash
+pxdocs search "usequery" --refresh   # force post-command fetch
+pxdocs search "usequery" --no-fetch  # skip fetch
+```
+
+The command still warns before output if the last known remote state says local `px-docs` is behind.
+
+## Install
+
+Preferred local install:
+
+```bash
+./install.sh
+```
+
+The script builds the Rust release binary and installs it to:
+
+```txt
+~/.local/bin/pxdocs
+```
+
+You can customize the bin directory:
+
+```bash
+PXDOCS_BIN_DIR="$HOME/bin" ./install.sh
+```
+
+Make sure the install directory is in your `PATH`. Add this to your shell startup file, such as `~/.zshrc`, `~/.bashrc`, or your shell equivalent:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Alternative install with Cargo:
 
 ```bash
 cargo install --path . --force
 ```
-
-Make sure Cargo's bin directory is in your `PATH`:
-
-```bash
-export PATH="$HOME/.cargo/bin:$PATH"
-```
-
-Add that line to your shell startup file, such as `~/.zshrc`, `~/.bashrc`, or your shell equivalent, then reload your shell or open a new terminal.
 
 Or run without installing:
 
@@ -30,23 +79,11 @@ pxdocs setup ~/dev/px-docs
 
 Without an argument, setup asks for the path interactively.
 
-If you run a docs command before setup, the CLI asks for the local path first. Press enter without typing a path to use the GitHub fallback.
+Config is stored at:
 
-## Commands
-
-```bash
-pxdocs doctor
-pxdocs decisions --guild front --limit 10
-pxdocs search "react query"
-pxdocs show 011 --guild front
-pxdocs show docs/front-guild/decisions/011-usequery-para-consulta-de-dados.md
-pxdocs search "usequery" --refresh
-pxdocs search "usequery" --no-fetch
+```txt
+~/.config/pxdocs/config.json
 ```
-
-Local docs commands warn from the last known remote state before printing results. To keep search fast, the CLI runs `git fetch` after the command output, at most once every 10 minutes by default.
-
-Use `--refresh` to force the post-command fetch or `--no-fetch` to skip it.
 
 ## Remote fallback
 
