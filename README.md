@@ -17,7 +17,7 @@ cargo install --path . --force
 ## Setup
 
 ```bash
-pxdocs setup ~/dev/px-docs
+pxdocs setup --path ~/dev/px-docs
 ```
 
 ## Usage
