@@ -15,16 +15,16 @@ npm prefix -g
 # add the printed path + /bin to PATH
 ```
 
-Example:
+For zsh, add this to `~/.zshrc`:
 
 ```bash
 export PATH="$(npm prefix -g)/bin:$PATH"
 ```
 
-Or create a symlink into a directory already in `PATH`:
+Then reload your shell:
 
 ```bash
-ln -sf "$(npm prefix -g)/bin/pxdocs" ~/.local/bin/pxdocs
+source ~/.zshrc
 ```
 
 Or run without installing:
