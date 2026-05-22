@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_REMOTE: &str = "px-center/px-docs";
-const FETCH_TTL_MS: u128 = 60 * 60 * 1000;
+const FETCH_TTL_MS: u128 = 24 * 60 * 60 * 1000;
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
