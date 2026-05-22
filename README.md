@@ -22,6 +22,8 @@ pxdocs setup ~/dev/px-docs
 
 Without an argument, setup asks for the path interactively.
 
+If you run a docs command before setup, the CLI asks for the local path first. Press enter without typing a path to use the GitHub fallback.
+
 ## Commands
 
 ```bash

@@ -1,4 +1,4 @@
-import { CONFIG_FILE, getDocsPath, getRemote, readConfig, setup } from './config.js';
+import { CONFIG_FILE, getDocsPath, getRemote, promptForDocsPath, readConfig, setup } from './config.js';
 import { filterDocs, findDocs, loadLocalDocs, printDocs, readLocalDoc, searchDocs } from './docs.js';
 import { getRepoStatus, printRepoWarning } from './git.js';
 import { assertGhAvailable, loadRemoteDocs, readRemoteDoc } from './remote.js';
@@ -12,7 +12,7 @@ export async function main(argv = process.argv) {
   if (command === 'doctor') return doctor();
 
   const options = parseOptions(args);
-  const source = loadSource(options.remote);
+  const source = await loadSource(options.remote);
 
   if (command === 'decisions') {
     return printDocs(filterDocs(source.docs, { type: 'decision', guild: options.guild, status: options.status }).slice(0, options.limit));
@@ -41,8 +41,12 @@ export async function main(argv = process.argv) {
   throw new Error(`unknown command: ${command}`);
 }
 
-function loadSource(forceRemote = false) {
-  const docsPath = getDocsPath();
+async function loadSource(forceRemote = false) {
+  let docsPath = getDocsPath();
+
+  if (!forceRemote && !docsPath) {
+    docsPath = await promptForDocsPath();
+  }
 
   if (!forceRemote && docsPath) {
     printRepoWarning(getRepoStatus(docsPath));

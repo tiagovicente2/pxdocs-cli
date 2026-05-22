@@ -18,15 +18,39 @@ export function writeConfig(config) {
 }
 
 export async function setup(pathArg) {
+  const docsPath = await askForDocsPath(pathArg, { allowEmpty: false });
+  saveDocsPath(docsPath);
+  console.log(`configured px-docs path: ${docsPath}`);
+}
+
+export async function promptForDocsPath() {
+  console.error('px-docs path is not configured.');
+  const docsPath = await askForDocsPath(undefined, { allowEmpty: true });
+
+  if (!docsPath) {
+    console.error('using GitHub fallback through gh');
+    return undefined;
+  }
+
+  saveDocsPath(docsPath);
+  console.error(`configured px-docs path: ${docsPath}`);
+  return docsPath;
+}
+
+async function askForDocsPath(pathArg, { allowEmpty }) {
   let docsPath = pathArg;
 
   if (!docsPath) {
     const rl = readline.createInterface({ input, output });
-    docsPath = await rl.question('px-docs local path: ');
+    const suffix = allowEmpty ? ', or press enter to use GitHub fallback' : '';
+    docsPath = await rl.question(`px-docs local path${suffix}: `);
     rl.close();
   }
 
-  docsPath = path.resolve(docsPath.trim().replace(/^~/, os.homedir()));
+  docsPath = docsPath.trim();
+  if (!docsPath && allowEmpty) return undefined;
+
+  docsPath = path.resolve(docsPath.replace(/^~/, os.homedir()));
 
   if (!fs.existsSync(docsPath)) {
     throw new Error(`path does not exist: ${docsPath}`);
@@ -36,9 +60,12 @@ export async function setup(pathArg) {
     throw new Error(`path does not look like px-docs: ${docsPath}`);
   }
 
+  return docsPath;
+}
+
+function saveDocsPath(docsPath) {
   const config = { ...readConfig(), docsPath, remote: 'px-center/px-docs' };
   writeConfig(config);
-  console.log(`configured px-docs path: ${docsPath}`);
 }
 
 export function getDocsPath() {
