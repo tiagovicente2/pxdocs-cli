@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_REMOTE: &str = "px-center/px-docs";
-const FETCH_TTL_MS: u128 = 10 * 60 * 1000;
+const FETCH_TTL_MS: u128 = 60 * 60 * 1000;
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -704,6 +704,6 @@ fn home_dir() -> PathBuf {
 
 fn print_help() {
     println!(
-        "pxdocs - discover PX docs from local files or GitHub\n\nUsage:\n  pxdocs setup [path]             configure local px-docs path\n  pxdocs doctor                   check config and whether repo is behind remote\n  pxdocs decisions [options]      list decision docs\n  pxdocs search <query> [options] search docs metadata\n  pxdocs show <path|id> [options] print a doc\n  pxdocs config                   print config\n\nOptions:\n  --guild <front|back|qa>         filter guild docs\n  --status <status>               filter by status text\n  --type <decision|adr|rfc|guide> filter doc type for show\n  --limit <number>                max results, default 20\n  --remote                        use gh CLI instead of local files\n  --refresh                       fetch after local command, ignoring TTL\n  --no-fetch                      skip fetch after local command\n\nFreshness:\n  Local commands warn from known remote state before output and fetch after output at most once every 10 minutes.\n"
+        "pxdocs - discover PX docs from local files or GitHub\n\nUsage:\n  pxdocs setup [path]             configure local px-docs path\n  pxdocs doctor                   check config and whether repo is behind remote\n  pxdocs decisions [options]      list decision docs\n  pxdocs search <query> [options] search docs metadata\n  pxdocs show <path|id> [options] print a doc\n  pxdocs config                   print config\n\nOptions:\n  --guild <front|back|qa>         filter guild docs\n  --status <status>               filter by status text\n  --type <decision|adr|rfc|guide> filter doc type for show\n  --limit <number>                max results, default 20\n  --remote                        use gh CLI instead of local files\n  --refresh                       fetch after local command, ignoring TTL\n  --no-fetch                      skip fetch after local command\n\nFreshness:\n  Local commands warn from known remote state before output and fetch periodically after output.\n"
     );
 }
