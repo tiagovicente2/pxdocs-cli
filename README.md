@@ -8,6 +8,12 @@ Fast CLI for finding PX docs from a local `px-docs` checkout, with optional GitH
 curl -fsSL https://raw.githubusercontent.com/tiagovicente2/pxdocs-cli/main/install.sh | bash
 ```
 
+Be sure the install path is configured:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 Or from a local checkout:
 
 ```bash
@@ -17,7 +23,7 @@ cargo install --path . --force
 ## Setup
 
 ```bash
-pxdocs setup --path <px-docs-path>
+pxdocs setup <px-docs-path>
 ```
 
 ## Usage
