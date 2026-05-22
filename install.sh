@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO="${PXDOCS_REPO:-tiagovicente2/pxdocs-cli}"
 APP_NAME="pxdocs"
-INSTALL_DIR="${PXDOCS_INSTALL_DIR:-$HOME/.local/share/pxdocs}"
 BIN_DIR="${PXDOCS_BIN_DIR:-$HOME/.local/bin}"
 
 log() { printf '[pxdocs] %s\n' "$*"; }
@@ -51,18 +50,19 @@ else
   log "checksums unavailable; skipping verification"
 fi
 
-rm -rf "$INSTALL_DIR"
-mkdir -p "$INSTALL_DIR"
-tar -xzf "$tmp_dir/$artifact" -C "$INSTALL_DIR" --strip-components=1
+extract_dir="$tmp_dir/extract"
+mkdir -p "$extract_dir"
+tar -xzf "$tmp_dir/$artifact" -C "$extract_dir" --strip-components=1
 
-launcher="$INSTALL_DIR/$APP_NAME"
+launcher="$extract_dir/$APP_NAME"
 if [[ ! -x "$launcher" ]]; then
-  launcher="$(find "$INSTALL_DIR" -maxdepth 2 -type f -perm -111 -name "$APP_NAME" | head -n 1 || true)"
+  launcher="$(find "$extract_dir" -maxdepth 2 -type f -perm -111 -name "$APP_NAME" | head -n 1 || true)"
 fi
-[[ -n "$launcher" && -x "$launcher" ]] || fail "executable not found under $INSTALL_DIR"
+[[ -n "$launcher" && -x "$launcher" ]] || fail "executable not found in $artifact"
 
 mkdir -p "$BIN_DIR"
-ln -sfn "$launcher" "$BIN_DIR/$APP_NAME"
+cp "$launcher" "$BIN_DIR/$APP_NAME"
+chmod +x "$BIN_DIR/$APP_NAME"
 
 log "installed: $BIN_DIR/$APP_NAME"
 if ! command -v "$APP_NAME" >/dev/null 2>&1; then
