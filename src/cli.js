@@ -1,5 +1,5 @@
 import { CONFIG_FILE, getDocsPath, getRemote, readConfig, setup } from './config.js';
-import { filterDocs, findDoc, loadLocalDocs, printDocs, readLocalDoc, searchDocs } from './docs.js';
+import { filterDocs, findDocs, loadLocalDocs, printDocs, readLocalDoc, searchDocs } from './docs.js';
 import { getRepoStatus, printRepoWarning } from './git.js';
 import { assertGhAvailable, loadRemoteDocs, readRemoteDoc } from './remote.js';
 
@@ -27,9 +27,14 @@ export async function main(argv = process.argv) {
   if (command === 'show') {
     const selector = options.positionals.join(' ');
     if (!selector) throw new Error('show requires a path or id');
-    const doc = findDoc(source.docs, selector);
-    if (!doc) throw new Error(`doc not found: ${selector}`);
-    console.log(source.remote ? readRemoteDoc(getRemote(), doc.path) : readLocalDoc(getDocsPath(), doc.path));
+    const matches = findDocs(source.docs, selector, { type: options.type, guild: options.guild, status: options.status });
+    if (matches.length === 0) throw new Error(`doc not found: ${selector}`);
+    if (matches.length > 1) {
+      printDocs(matches.slice(0, options.limit));
+      throw new Error(`ambiguous selector: ${selector}. narrow with --guild or use a path`);
+    }
+
+    console.log(source.remote ? readRemoteDoc(getRemote(), matches[0].path) : readLocalDoc(getDocsPath(), matches[0].path));
     return;
   }
 
@@ -81,6 +86,7 @@ function parseOptions(args) {
     if (arg === '--remote') options.remote = true;
     else if (arg === '--guild') options.guild = args[++index];
     else if (arg === '--status') options.status = args[++index];
+    else if (arg === '--type') options.type = args[++index];
     else if (arg === '--limit') options.limit = Number(args[++index]);
     else options.positionals.push(arg);
   }
@@ -89,5 +95,5 @@ function parseOptions(args) {
 }
 
 function printHelp() {
-  console.log(`pxdocs - discover PX docs from local files or GitHub\n\nUsage:\n  pxdocs setup [path]             configure local px-docs path\n  pxdocs doctor                   check config and whether repo is behind remote\n  pxdocs decisions [options]      list decision docs\n  pxdocs search <query> [options] search docs metadata\n  pxdocs show <path|id> [options] print a doc\n  pxdocs config                   print config\n\nOptions:\n  --guild <front|back|qa>         filter guild docs\n  --status <status>               filter by status text\n  --limit <number>                max results, default 20\n  --remote                        use gh CLI instead of local files\n`);
+  console.log(`pxdocs - discover PX docs from local files or GitHub\n\nUsage:\n  pxdocs setup [path]             configure local px-docs path\n  pxdocs doctor                   check config and whether repo is behind remote\n  pxdocs decisions [options]      list decision docs\n  pxdocs search <query> [options] search docs metadata\n  pxdocs show <path|id> [options] print a doc\n  pxdocs config                   print config\n\nOptions:\n  --guild <front|back|qa>         filter guild docs\n  --status <status>               filter by status text\n  --type <decision|adr|rfc|guide> filter doc type for show\n  --limit <number>                max results, default 20\n  --remote                        use gh CLI instead of local files\n`);
 }

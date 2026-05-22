@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { parseDoc } from './docs.js';
+import { buildDocFromPath } from './docs.js';
 
 function gh(args) {
   return execFileSync('gh', args, {
@@ -11,14 +11,10 @@ function gh(args) {
 
 export function loadRemoteDocs(remote) {
   const tree = JSON.parse(gh(['api', `repos/${remote}/git/trees/HEAD?recursive=1`]));
-  const files = tree.tree
+  return tree.tree
     .filter((item) => item.type === 'blob' && item.path.startsWith('docs/') && item.path.endsWith('.md'))
-    .map((item) => item.path);
-
-  return files.map((file) => {
-    const content = readRemoteDoc(remote, file);
-    return parseDoc(file, content);
-  });
+    .map((item) => buildDocFromPath(item.path))
+    .sort((a, b) => a.path.localeCompare(b.path));
 }
 
 export function readRemoteDoc(remote, filePath) {

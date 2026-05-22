@@ -24,7 +24,7 @@ export function walkMarkdown(rootDir) {
   }
 
   walk(path.join(rootDir, 'docs'));
-  return files;
+  return files.sort();
 }
 
 export function parseDoc(filePath, content, rootDir = '') {
@@ -52,10 +52,27 @@ export function readLocalDoc(rootDir, docPath) {
   return fs.readFileSync(path.join(rootDir, docPath), 'utf8');
 }
 
-export function findDoc(docs, selector) {
-  return docs.find((doc) => doc.path === selector)
-    ?? docs.find((doc) => doc.id === selector)
-    ?? docs.find((doc) => doc.path.includes(selector));
+export function findDocs(docs, selector, options = {}) {
+  const scopedDocs = filterDocs(docs, options);
+
+  return scopedDocs.filter((doc) => doc.path === selector)
+    .concat(scopedDocs.filter((doc) => doc.id === selector))
+    .concat(scopedDocs.filter((doc) => doc.path.includes(selector)))
+    .filter((doc, index, all) => all.findIndex((candidate) => candidate.path === doc.path) === index);
+}
+
+export function buildDocFromPath(filePath) {
+  const normalized = filePath.replaceAll(path.sep, '/');
+  const baseName = path.basename(normalized, '.md');
+  const title = baseName
+    .replace(/^(?:adr-|rfc-)?\d+-?/i, '')
+    .replaceAll('-', ' ')
+    .trim() || baseName;
+  const type = DOC_TYPES.find((candidate) => normalized.includes(candidate.marker))?.type ?? 'doc';
+  const guild = normalized.match(/^docs\/(front|back|qa)-guild\//)?.[1] ?? undefined;
+  const id = baseName.match(/^(?:adr-|rfc-)?(\d+)/i)?.[1] ?? undefined;
+
+  return { path: normalized, title, status: 'unknown', date: 'unknown', type, guild, id };
 }
 
 export function filterDocs(docs, options = {}) {
