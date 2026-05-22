@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${PXDOCS_REPO:-px-center/pxdocs-cli}"
+REPO="${PXDOCS_REPO:-tiagovicente2/pxdocs-cli}"
 APP_NAME="pxdocs"
 INSTALL_DIR="${PXDOCS_INSTALL_DIR:-$HOME/.local/share/pxdocs}"
 BIN_DIR="${PXDOCS_BIN_DIR:-$HOME/.local/bin}"

@@ -5,7 +5,7 @@ Fast CLI for finding PX docs from a local `px-docs` checkout, with optional GitH
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/px-center/pxdocs-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tiagovicente2/pxdocs-cli/main/install.sh | bash
 ```
 
 Or from a local checkout:
