@@ -6,6 +6,7 @@ import { stdin as input, stdout as output } from 'node:process';
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'pxdocs');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+const FETCH_TTL_MS = 10 * 60 * 1000;
 
 export function readConfig() {
   if (!fs.existsSync(CONFIG_FILE)) return {};
@@ -76,4 +77,23 @@ export function getRemote() {
   return readConfig().remote ?? 'px-center/px-docs';
 }
 
-export { CONFIG_FILE };
+export function shouldFetchDocs(docsPath, { force = false, skip = false } = {}) {
+  if (skip) return false;
+  if (force) return true;
+
+  const lastFetchAt = readConfig().lastFetchAtByPath?.[docsPath];
+  return !lastFetchAt || Date.now() - lastFetchAt > FETCH_TTL_MS;
+}
+
+export function markDocsFetched(docsPath) {
+  const config = readConfig();
+  writeConfig({
+    ...config,
+    lastFetchAtByPath: {
+      ...(config.lastFetchAtByPath ?? {}),
+      [docsPath]: Date.now(),
+    },
+  });
+}
+
+export { CONFIG_FILE, FETCH_TTL_MS };

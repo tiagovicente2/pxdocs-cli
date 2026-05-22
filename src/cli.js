@@ -1,4 +1,4 @@
-import { CONFIG_FILE, getDocsPath, getRemote, promptForDocsPath, readConfig, setup } from './config.js';
+import { CONFIG_FILE, FETCH_TTL_MS, getDocsPath, getRemote, markDocsFetched, promptForDocsPath, readConfig, setup, shouldFetchDocs } from './config.js';
 import { filterDocs, findDocs, loadLocalDocs, printDocs, readLocalDoc, searchDocs } from './docs.js';
 import { getRepoStatus, printRepoWarning } from './git.js';
 import { assertGhAvailable, loadRemoteDocs, readRemoteDoc } from './remote.js';
@@ -12,7 +12,7 @@ export async function main(argv = process.argv) {
   if (command === 'doctor') return doctor();
 
   const options = parseOptions(args);
-  const source = await loadSource(options.remote);
+  const source = await loadSource(options);
 
   if (command === 'decisions') {
     return printDocs(filterDocs(source.docs, { type: 'decision', guild: options.guild, status: options.status }).slice(0, options.limit));
@@ -41,15 +41,18 @@ export async function main(argv = process.argv) {
   throw new Error(`unknown command: ${command}`);
 }
 
-async function loadSource(forceRemote = false) {
+async function loadSource(options) {
   let docsPath = getDocsPath();
 
-  if (!forceRemote && !docsPath) {
+  if (!options.remote && !docsPath) {
     docsPath = await promptForDocsPath();
   }
 
-  if (!forceRemote && docsPath) {
-    printRepoWarning(getRepoStatus(docsPath));
+  if (!options.remote && docsPath) {
+    const fetch = shouldFetchDocs(docsPath, { force: options.refresh, skip: options.noFetch });
+    const status = getRepoStatus(docsPath, { fetch });
+    if (fetch && status.ok) markDocsFetched(docsPath);
+    printRepoWarning(status);
     return { docs: loadLocalDocs(docsPath), remote: false };
   }
 
@@ -71,7 +74,8 @@ function doctor() {
   }
 
   console.log(`px-docs path: ${docsPath}`);
-  const status = getRepoStatus(docsPath);
+  const status = getRepoStatus(docsPath, { fetch: true });
+  if (status.ok) markDocsFetched(docsPath);
   if (!status.ok) {
     console.log(`git status: ${status.message}`);
     return;
@@ -88,6 +92,8 @@ function parseOptions(args) {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--remote') options.remote = true;
+    else if (arg === '--refresh') options.refresh = true;
+    else if (arg === '--no-fetch') options.noFetch = true;
     else if (arg === '--guild') options.guild = args[++index];
     else if (arg === '--status') options.status = args[++index];
     else if (arg === '--type') options.type = args[++index];
@@ -99,5 +105,5 @@ function parseOptions(args) {
 }
 
 function printHelp() {
-  console.log(`pxdocs - discover PX docs from local files or GitHub\n\nUsage:\n  pxdocs setup [path]             configure local px-docs path\n  pxdocs doctor                   check config and whether repo is behind remote\n  pxdocs decisions [options]      list decision docs\n  pxdocs search <query> [options] search docs metadata\n  pxdocs show <path|id> [options] print a doc\n  pxdocs config                   print config\n\nOptions:\n  --guild <front|back|qa>         filter guild docs\n  --status <status>               filter by status text\n  --type <decision|adr|rfc|guide> filter doc type for show\n  --limit <number>                max results, default 20\n  --remote                        use gh CLI instead of local files\n`);
+  console.log(`pxdocs - discover PX docs from local files or GitHub\n\nUsage:\n  pxdocs setup [path]             configure local px-docs path\n  pxdocs doctor                   check config and whether repo is behind remote\n  pxdocs decisions [options]      list decision docs\n  pxdocs search <query> [options] search docs metadata\n  pxdocs show <path|id> [options] print a doc\n  pxdocs config                   print config\n\nOptions:\n  --guild <front|back|qa>         filter guild docs\n  --status <status>               filter by status text\n  --type <decision|adr|rfc|guide> filter doc type for show\n  --limit <number>                max results, default 20\n  --remote                        use gh CLI instead of local files\n  --refresh                       force git fetch before local command\n  --no-fetch                      skip git fetch for local command\n\nFreshness:\n  Local commands fetch at most once every ${Math.round(FETCH_TTL_MS / 60000)} minutes.\n`);
 }

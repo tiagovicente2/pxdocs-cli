@@ -47,9 +47,13 @@ pxdocs decisions --guild front --limit 10
 pxdocs search "react query"
 pxdocs show 011 --guild front
 pxdocs show docs/front-guild/decisions/011-usequery-para-consulta-de-dados.md
+pxdocs search "usequery" --refresh
+pxdocs search "usequery" --no-fetch
 ```
 
-Every local docs command checks whether the configured repo is behind its upstream and prints a warning when it is.
+Local docs commands check whether the configured repo is behind its upstream and print a warning when it is. To keep search fast, the CLI runs `git fetch` at most once every 10 minutes by default.
+
+Use `--refresh` to force a fetch or `--no-fetch` to skip it:
 
 ## Remote fallback
 
