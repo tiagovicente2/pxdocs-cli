@@ -1,8 +1,11 @@
+use base64::Engine;
+use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::{self, Write};
+use std::io::Cursor;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -29,7 +32,7 @@ struct Doc {
     summary: Option<String>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Options {
     positionals: Vec<String>,
     limit: usize,
@@ -61,7 +64,10 @@ fn run() -> Result<(), String> {
     }
 
     match command.as_str() {
-        "help" | "--help" | "-h" => return Ok(print_help()),
+        "help" | "--help" | "-h" => {
+            print_help();
+            return Ok(());
+        }
         "setup" => return setup(args.first().map(String::as_str)),
         "config" => return print_config(),
         "doctor" => return doctor(),
@@ -69,7 +75,7 @@ fn run() -> Result<(), String> {
     }
 
     let options = parse_options(args)?;
-    let source = load_source(&options)?;
+    let source = load_source(&options, &command)?;
 
     match command.as_str() {
         "decisions" => {
@@ -183,25 +189,27 @@ fn ask_for_docs_path(path_arg: Option<&str>, allow_empty: bool) -> Result<Option
     Ok(Some(path))
 }
 
-fn load_source(options: &Options) -> Result<Source, String> {
+fn load_source(options: &Options, command: &str) -> Result<Source, String> {
     let mut local_path = docs_path();
     if !options.remote && local_path.is_none() {
         local_path = prompt_for_docs_path()?;
     }
 
-    if !options.remote {
-        if let Some(path) = local_path {
-            warn_if_known_behind(&path);
-            return Ok(Source {
-                docs: load_local_docs(&path)?,
-                remote: false,
-            });
-        }
+    if !options.remote
+        && let Some(path) = local_path
+    {
+        warn_if_known_behind(&path);
+        return Ok(Source {
+            docs: load_local_docs(&path)?,
+            remote: false,
+        });
     }
 
     assert_gh_available()?;
+    let include_content = command == "decisions" || options.status.is_some();
+    let remote_doc_type = (command == "decisions").then_some("decision");
     Ok(Source {
-        docs: load_remote_docs(&remote())?,
+        docs: load_remote_docs(&remote(), include_content, remote_doc_type)?,
         remote: true,
     })
 }
@@ -216,25 +224,30 @@ fn maybe_fetch_after_command(source: &Source, options: &Options) {
     if !options.refresh && !should_fetch(&path) {
         return;
     }
-    let _ = Command::new("git")
+    let Ok(status) = Command::new("git")
         .arg("-C")
         .arg(&path)
         .args(["fetch", "--quiet"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn();
-    let _ = mark_docs_fetched(&path);
+        .status()
+    else {
+        return;
+    };
+    if status.success() {
+        let _ = mark_docs_fetched(&path);
+    }
 }
 
 fn warn_if_known_behind(path: &Path) {
-    if let Ok(status) = repo_status(path, false) {
-        if status.behind > 0 {
-            eprintln!(
-                "warning: px-docs is {} commit(s) behind {}",
-                status.behind, status.upstream
-            );
-        }
+    if let Ok(status) = repo_status(path, false)
+        && status.behind > 0
+    {
+        eprintln!(
+            "warning: px-docs is {} commit(s) behind {}",
+            status.behind, status.upstream
+        );
     }
 }
 
@@ -418,8 +431,8 @@ fn read_local_doc(root: &Path, doc_path: &str) -> Result<String, String> {
     fs::read_to_string(root.join(doc_path)).map_err(|error| error.to_string())
 }
 
-fn filter_docs<'a>(
-    docs: &'a [Doc],
+fn filter_docs(
+    docs: &[Doc],
     doc_type: Option<&str>,
     guild: Option<&str>,
     status: Option<&str>,
@@ -428,8 +441,9 @@ fn filter_docs<'a>(
         .filter(|doc| {
             doc_type.is_none_or(|value| doc.doc_type == value)
                 && guild.is_none_or(|value| doc.guild.as_deref() == Some(value))
-                && status
-                    .is_none_or(|value| doc.status.to_lowercase().contains(&value.to_lowercase()))
+                && status.is_none_or(|value| {
+                    doc.status.to_lowercase().starts_with(&value.to_lowercase())
+                })
         })
         .cloned()
         .collect()
@@ -504,17 +518,72 @@ where
     }
 }
 
-fn load_remote_docs(remote: &str) -> Result<Vec<Doc>, String> {
+fn load_remote_docs(
+    remote: &str,
+    include_content: bool,
+    doc_type_filter: Option<&str>,
+) -> Result<Vec<Doc>, String> {
+    if include_content {
+        return load_remote_docs_from_tarball(remote, doc_type_filter);
+    }
+
     let output = gh(&[
         "api",
         &format!("repos/{remote}/git/trees/HEAD?recursive=1"),
         "--jq",
         r#".tree[] | select(.type=="blob" and (.path|startswith("docs/")) and (.path|endswith(".md"))) | .path"#,
     ])?;
-    let mut docs: Vec<Doc> = output
+    let paths: Vec<&str> = output
         .lines()
+        .filter(|path| doc_type_filter.is_none_or(|expected_type| expected_type == doc_type(path)))
+        .collect();
+    let mut docs: Vec<Doc> = paths
+        .into_iter()
         .map(|line| parse_doc(Path::new(line), None, None))
         .collect();
+    docs.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(docs)
+}
+
+fn load_remote_docs_from_tarball(
+    remote: &str,
+    doc_type_filter: Option<&str>,
+) -> Result<Vec<Doc>, String> {
+    let bytes = gh_bytes(&["api", &format!("repos/{remote}/tarball/HEAD")])?;
+    let decoder = GzDecoder::new(Cursor::new(bytes));
+    let mut archive = tar::Archive::new(decoder);
+    let mut docs = Vec::new();
+
+    for entry in archive.entries().map_err(|error| error.to_string())? {
+        let mut entry = entry.map_err(|error| error.to_string())?;
+        if !entry.header().entry_type().is_file() {
+            continue;
+        }
+        let path = entry.path().map_err(|error| error.to_string())?;
+        let Some(relative) = path
+            .components()
+            .skip(1)
+            .collect::<PathBuf>()
+            .to_str()
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let normalized = relative.replace('\\', "/");
+        if !normalized.starts_with("docs/") || !normalized.ends_with(".md") {
+            continue;
+        }
+        if doc_type_filter.is_some_and(|expected_type| expected_type != doc_type(&normalized)) {
+            continue;
+        }
+
+        let mut content = String::new();
+        entry
+            .read_to_string(&mut content)
+            .map_err(|error| error.to_string())?;
+        docs.push(parse_doc(Path::new(&normalized), Some(&content), None));
+    }
+
     docs.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(docs)
 }
@@ -526,24 +595,10 @@ fn read_remote_doc(remote: &str, path: &str) -> Result<String, String> {
         "--jq",
         ".content",
     ])?;
-    let output = Command::new("base64")
-        .arg("-d")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            child
-                .stdin
-                .as_mut()
-                .unwrap()
-                .write_all(content.replace('\n', "").as_bytes())?;
-            child.wait_with_output()
-        })
-        .map_err(|error| error.to_string())?;
-    if !output.status.success() {
-        return Err("failed to decode GitHub content".to_string());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(content.replace('\n', ""))
+        .map_err(|error| format!("failed to decode GitHub content: {error}"))?;
+    String::from_utf8(decoded).map_err(|error| format!("GitHub content is not UTF-8: {error}"))
 }
 
 fn assert_gh_available() -> Result<(), String> {
@@ -551,14 +606,26 @@ fn assert_gh_available() -> Result<(), String> {
 }
 
 fn gh(args: &[&str]) -> Result<String, String> {
-    let output = Command::new("gh")
-        .args(args)
-        .output()
-        .map_err(|error| error.to_string())?;
+    let output = gh_output(args)?;
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn gh_bytes(args: &[&str]) -> Result<Vec<u8>, String> {
+    let output = gh_output(args)?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(output.stdout)
+}
+
+fn gh_output(args: &[&str]) -> Result<std::process::Output, String> {
+    Command::new("gh")
+        .args(args)
+        .output()
+        .map_err(|error| error.to_string())
 }
 
 fn print_config() -> Result<(), String> {
@@ -598,28 +665,38 @@ fn parse_options(args: Vec<String>) -> Result<Options, String> {
             "--no-fetch" => options.no_fetch = true,
             "--guild" => {
                 index += 1;
-                options.guild = args.get(index).cloned();
+                options.guild = Some(option_value(&args, index, "--guild")?.to_string());
             }
             "--status" => {
                 index += 1;
-                options.status = args.get(index).cloned();
+                options.status = Some(option_value(&args, index, "--status")?.to_string());
             }
             "--type" => {
                 index += 1;
-                options.doc_type = args.get(index).cloned();
+                options.doc_type = Some(option_value(&args, index, "--type")?.to_string());
             }
             "--limit" => {
                 index += 1;
-                options.limit = args
-                    .get(index)
-                    .and_then(|value| value.parse().ok())
-                    .unwrap_or(20);
+                let value = option_value(&args, index, "--limit")?;
+                options.limit = value
+                    .parse()
+                    .map_err(|_| "--limit must be a positive number".to_string())?;
             }
             value => options.positionals.push(value.to_string()),
         }
         index += 1;
     }
     Ok(options)
+}
+
+fn option_value<'a>(args: &'a [String], index: usize, option: &str) -> Result<&'a str, String> {
+    let Some(value) = args.get(index) else {
+        return Err(format!("{option} requires a value"));
+    };
+    if value.starts_with("--") {
+        return Err(format!("{option} requires a value"));
+    }
+    Ok(value)
 }
 
 fn config_file() -> PathBuf {
