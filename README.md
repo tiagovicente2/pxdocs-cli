@@ -1,6 +1,6 @@
 # pxdocs-cli
 
-Fast CLI for finding PX docs from a local `px-docs` checkout, with optional GitHub fallback.
+Fast Rust CLI for finding PX docs, decisions, guides, ADRs and RFCs from a local `px-docs` checkout, with optional GitHub fallback.
 
 ## Install
 
