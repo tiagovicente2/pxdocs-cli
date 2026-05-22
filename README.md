@@ -8,6 +8,25 @@ CLI for discovering PX docs from a local `px-docs` checkout, with an optional Gi
 npm install -g .
 ```
 
+If `pxdocs` is not found after installing, make sure the npm global bin directory is in your `PATH`:
+
+```bash
+npm prefix -g
+# add the printed path + /bin to PATH
+```
+
+Example:
+
+```bash
+export PATH="$(npm prefix -g)/bin:$PATH"
+```
+
+Or create a symlink into a directory already in `PATH`:
+
+```bash
+ln -sf "$(npm prefix -g)/bin/pxdocs" ~/.local/bin/pxdocs
+```
+
 Or run without installing:
 
 ```bash
